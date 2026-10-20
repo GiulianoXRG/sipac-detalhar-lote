@@ -27,7 +27,7 @@ SIPAC, a partir da Mesa Virtual, pasta **07 - PAGOS**. Responder em português, 
 - Registro: `st` = NOVO | PRONTO | GRAVADO | PENDENTE | IGNORADO | ARQUIVADO | MOVIDO; `caso` = SIMPLES | DARF | INSS | ISS | ISS+DARF;
   `partes` (2+ requisições: `{req, valor, obValor, feito, externo}`); `rev` (aver/vendo/esperando/resolvido), `revNota`;
   `relConf` (conferência no relatório), `tentado/tentEtapa/tentEm`, `gravadoTs`, `destinoTs`, `nota/notaEm`.
-- Prototype.js no SIPAC: sempre `delete Array.prototype.toJSON` antes de JSON; **não usar `Array.prototype.reduce`** (usar `somar`).
+- Prototype.js no SIPAC: todo JSON.stringify passa por `jsonSeguro()` (tira `Array.prototype.toJSON`); leitura de backup passa por `consertarBackup()`; **não usar `Array.prototype.reduce`** (usar `somar`).
 - Detalhamento roda num **iframe** à esquerda (`F`); o painel fica à direita.
 
 ## Fluxo

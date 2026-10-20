@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## 0.19.2 — 20/10/2026
+- Corrigido o backup: o Prototype.js do SIPAC transformava as listas (requisições de cada processo, log) em texto no arquivo, e a importação em outro computador quebrava o painel ("r.partes.some is not a function").
+- Backups antigos continuam valendo: a importação conserta as listas; dados já importados com o defeito são consertados ao abrir o painel.
+
 ## 0.19.1 — 20/10/2026
 - Repositório público: aviso de uso no README; exemplos e testes sem dados reais.
 

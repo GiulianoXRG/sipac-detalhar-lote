@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SIPAC – Detalhar Despesas em lote
 // @namespace    giuliano.sipac
-// @version      0.19.1
+// @version      0.19.2
 // @description  Analisa a página da 07 - PAGOS, detalha os prontos (inclusive ISS com DAR em Tributos), arquiva SIMPLES/ISS por mês e move DARF/INSS para a 08.
 // @match        https://sipac.ufrn.br/sipac/*
 // @match        http://sipac.ufrn.br/sipac/*
@@ -19,7 +19,7 @@
 
   function iniciarPainel() {
     if (document.getElementById('sdl')) return;
-    const VERSAO = '0.19.1';
+    const VERSAO = '0.19.2';
 
     // ================= ESTADO =================
     const ST = {
@@ -39,6 +39,33 @@
     };
 
     const S = ms => new Promise(r => setTimeout(r, ms));
+    // JSON sem a interferência do Prototype.js do SIPAC (Array.prototype.toJSON transforma listas em texto)
+    const jsonSeguro = (v, esp) => {
+      const t = Array.prototype.toJSON;
+      delete Array.prototype.toJSON;
+      try { return JSON.stringify(v, null, esp); }
+      finally { if (t) Array.prototype.toJSON = t; }
+    };
+    // Conserta listas que viraram texto ("[...]") em backups antigos / dados importados
+    const listaDeTexto = v => {
+      if (typeof v !== 'string' || !/^\s*\[[\s\S]*\]\s*$/.test(v)) return v;
+      try { let x = JSON.parse(v); while (typeof x === 'string' && /^\s*\[/.test(x)) x = JSON.parse(x); return Array.isArray(x) ? x : v; } catch (e) { return v; }
+    };
+    const CAMPOS_LISTA = ['partes', 'reqs', 'vistos', 'feitos', 'grupos', 'ids', 'idsAgora'];
+    const consertarRegistro = r => {
+      if (!r || typeof r !== 'object') return r;
+      CAMPOS_LISTA.forEach(k => { if (k in r) r[k] = listaDeTexto(r[k]); });
+      if (Array.isArray(r.partes)) r.partes = r.partes.map(q => typeof q === 'string' ? (() => { try { return JSON.parse(q); } catch (e) { return q; } })() : q);
+      return r;
+    };
+    const consertarBackup = d => {
+      if (!d || typeof d !== 'object') return d;
+      if (typeof d.proc === 'string') { try { d.proc = JSON.parse(d.proc); } catch (e) {} }
+      if (d.proc && typeof d.proc === 'object') Object.keys(d.proc).forEach(id => consertarRegistro(d.proc[id]));
+      d.log = listaDeTexto(d.log);
+      if (!Array.isArray(d.log)) d.log = [];
+      return d;
+    };
     const num = s => s == null ? NaN : +String(s).replace(/\./g, '').replace(',', '.');
     const cn = s => String(s || '').replace(/\D/g, '');
     const cl = s => s == null ? s : String(s).replace(/\.$/, '');
@@ -325,7 +352,7 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
 .sdl-alvo{outline:4px solid #e53935!important;outline-offset:2px;animation:sdlpisca 1s infinite}
 @keyframes sdlpisca{50%{outline-color:#ffb300}}
 </style>
-<header><b>SIPAC · Detalhar lote</b><small>v0.19.1</small><span class="sp"></span>
+<header><b>SIPAC · Detalhar lote</b><small>v0.19.2</small><span class="sp"></span>
   <span class="ic" id="sdl-pin" title="Empurrar a página para o painel não cobrir a Mesa">📌</span>
   <span class="ic" id="sdl-som" title="Aviso sonoro quando um processo estiver pronto para gravar">🔔</span>
   <span class="ic" id="sdl-max" title="Aumentar/diminuir">⛶</span>
@@ -2698,7 +2725,7 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
     function baixarBackup(sufixo) {
       const dados = dadosBackup();
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([JSON.stringify(dados, null, 1)], { type: 'application/json' }));
+      a.href = URL.createObjectURL(new Blob([jsonSeguro(dados, 1)], { type: 'application/json' }));
       const d = new Date(), z = n => String(n).padStart(2, '0');
       a.download = `sipac-detalhar-backup-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}_${z(d.getHours())}h${z(d.getMinutes())}${sufixo || ''}.json`;
       document.body.appendChild(a); a.click(); a.remove();
@@ -2757,7 +2784,7 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
       try {
         const fh = await BK.dir.getFileHandle(`sipac-backup-${hojeISO()}.json`, { create: true });
         const w = await fh.createWritable();
-        await w.write(JSON.stringify(dadosBackup(), null, 1));
+        await w.write(jsonSeguro(dadosBackup(), 1));
         await w.close();
         marcarBackup('pasta');
         BK.erro = '';
@@ -2783,7 +2810,7 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
         const k = 'snap:' + hojeISO();
         const ult = +(localStorage.getItem('sdl-snapT') || 0);
         if (!forcar && (!mudouDesde(ult) || Date.now() - ult < 10 * 60000)) return;
-        await IDB.set(k, { t: Date.now(), dados: JSON.stringify(dadosBackup()) });
+        await IDB.set(k, { t: Date.now(), dados: jsonSeguro(dadosBackup()) });
         try { localStorage.setItem('sdl-snapT', String(Date.now())); } catch (e) {}
         const ks = (await IDB.keys()).filter(x => /^snap:\d{4}-\d{2}-\d{2}$/.test(x)).sort().reverse();
         for (const velho of ks.slice(7)) await IDB.del(velho);
@@ -2806,10 +2833,10 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
       if (!k) return;
       const v = await IDB.get(k);
       if (!v) return alert('Cópia não encontrada.');
-      const d = JSON.parse(v.dados);
+      const d = consertarBackup(JSON.parse(v.dados));
       if (!confirm(`Voltar o painel para a cópia de ${new Date(v.t).toLocaleString('pt-BR')} (${Object.keys(d.proc).length} processos)?\n\n` +
         `O estado atual é guardado antes em "Antes da última restauração" – dá para desfazer.`)) return;
-      await IDB.set('snap:antes-restaurar', { t: Date.now(), dados: JSON.stringify(dadosBackup()) });
+      await IDB.set('snap:antes-restaurar', { t: Date.now(), dados: jsonSeguro(dadosBackup()) });
       ST.set('proc', d.proc);
       if (Array.isArray(d.log)) ST.set('log', d.log);
       LOG(`🕘 Painel restaurado da cópia de ${new Date(v.t).toLocaleString('pt-BR')}.`);
@@ -2839,8 +2866,10 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
       e.target.value = '';
       if (!f) return;
       let d;
-      try { d = JSON.parse(await f.text()); } catch (er) { return alert('Arquivo inválido: ' + er.message); }
-      if (!d || d.app !== 'sipac-detalhar-lote' || typeof d.proc !== 'object') return alert('Esse arquivo não é um backup do painel.');
+      try { d = JSON.parse((await f.text()).replace(/^\uFEFF/, '')); } catch (er) { return alert('Arquivo inválido (não é JSON): ' + er.message); }
+      if (!d || d.app !== 'sipac-detalhar-lote') return alert('Esse arquivo não é um backup do painel (procure um arquivo sipac-…backup….json).');
+      consertarBackup(d);
+      if (!d.proc || typeof d.proc !== 'object') return alert('O backup não tem a lista de processos – arquivo incompleto.');
       const P0 = todos();
       let novos = 0, atualizados = 0, notas = 0;
       Object.keys(d.proc).forEach(id => {
@@ -2885,6 +2914,15 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
       prog('Dados limpos.');
       render();
     };
+
+    // v0.19.2: conserta listas que viraram texto (backups importados antes da correção)
+    (() => {
+      const P0 = todos(); let n = 0;
+      Object.keys(P0).forEach(id => { const antes = jsonSeguro(P0[id]); consertarRegistro(P0[id]); if (jsonSeguro(P0[id]) !== antes) n++; });
+      if (n) { ST.set('proc', P0); LOG(`Corrigidos ${n} registro(s) importados de backup antigo.`); }
+      const lg = listaDeTexto(ST.get('log', []));
+      if (!Array.isArray(ST.get('log', []))) ST.set('log', Array.isArray(lg) ? lg : []);
+    })();
 
     // v0.17: pendências antigas de empenho ganham o texto novo (com o nº do empenho)
     (() => {
