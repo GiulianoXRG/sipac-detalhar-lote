@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## 0.20.0 — 23/10/2026
+- Empenho de ano anterior (ex.: NE 2025) no "Outros": o painel troca o ano orçamentário do SIPAC (combo do módulo Orçamento) para o ano do empenho antes de pesquisar e volta para 2026 no fim da fila ou ao Parar.
+- Pendências "EMPENHO NÃO CADASTRADO" de empenho de ano anterior voltam para PRONTO uma vez, ao abrir o painel.
+- Se a página recarregar com o ano trocado, o log avisa; o próximo "Detalhar prontos" corrige o ano sozinho.
+
 ## 0.19.2 — 20/10/2026
 - Corrigido o backup: o Prototype.js do SIPAC transformava as listas (requisições de cada processo, log) em texto no arquivo, e a importação em outro computador quebrava o painel ("r.partes.some is not a function").
 - Backups antigos continuam valendo: a importação conserta as listas; dados já importados com o defeito são consertados ao abrir o painel.

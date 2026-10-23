@@ -1,6 +1,6 @@
 {
   "name": "sipac-detalhar-lote",
-  "version": "0.19.2",
+  "version": "0.20.0",
   "private": true,
   "description": "Userscript (Tampermonkey) para detalhar despesas em lote no SIPAC/UFRN",
   "scripts": {

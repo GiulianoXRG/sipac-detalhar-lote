@@ -58,7 +58,9 @@ SIPAC, a partir da Mesa Virtual, pasta **07 - PAGOS**. Responder em português, 
   CNPJ divergente; OB cita outro processo; NS só em LISTA do SIAFI; requisição recusada pelo SIPAC
   ("unidade de custo não está vinculada à gestora"); 2+ DARs; DAR fora do padrão.
 - **Empenho não cadastrado**: o SIPAC responde "Empenho não cadastrado para a gestora CENTRO DE CIÊNCIAS DA SAÚDE (15.00) ou não existe."
-  (visto em empenhos de 2025: a tela "Outros" não tem campo de ano e busca no orçamento 2026). Pendência com o texto
+  (visto em empenhos de 2025: a tela "Outros" não tem campo de ano e busca no orçamento da sessão). Desde a v0.20 o painel
+  troca o ano: `/sipac/orcamento/index.jsf` → `menuForm:anoOrcamentario` (onchange A4J, spinner `menuForm:imgStAno`); o form
+  mostra "Orçamento: AAAA". Vale para a sessão toda; volta para 2026 no fim da fila (`sdl2_anoOrc` guarda a troca). Se ainda falhar, pendência com o texto
   `EMPENHO NÃO CADASTRADO: NE n/ano …` (`textoErroEmpenho`). "O empenho já foi totalmente liquidado." → `EMPENHO JÁ LIQUIDADO`.
 
 ## Mapa do SIPAC (testado em 20/10/2026)

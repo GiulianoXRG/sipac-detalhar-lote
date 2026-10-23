@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SIPAC – Detalhar Despesas em lote
 // @namespace    giuliano.sipac
-// @version      0.19.2
+// @version      0.20.0
 // @description  Analisa a página da 07 - PAGOS, detalha os prontos (inclusive ISS com DAR em Tributos), arquiva SIMPLES/ISS por mês e move DARF/INSS para a 08.
 // @match        https://sipac.ufrn.br/sipac/*
 // @match        http://sipac.ufrn.br/sipac/*
@@ -19,7 +19,7 @@
 
   function iniciarPainel() {
     if (document.getElementById('sdl')) return;
-    const VERSAO = '0.19.2';
+    const VERSAO = '0.20.0';
 
     // ================= ESTADO =================
     const ST = {
@@ -203,8 +203,8 @@
       const ano = neAno || ANO, numNE = `NE ${ne || '?'}/${ano}`;
       if (/totalmente liquidado/i.test(sp))
         return `EMPENHO JÁ LIQUIDADO: ${numNE} já foi totalmente liquidado no SIPAC – conferir se o processo já foi detalhado ou se o empenho está certo – SIPAC: "${sp}"`;
-      return `EMPENHO NÃO CADASTRADO: ${numNE} não existe para a gestora no SIPAC (orçamento ${ANO})` +
-        (String(ano) !== ANO ? ` – é empenho de ${ano} (exercício anterior / restos a pagar): detalhar à parte ou ver com a chefia`
+      return `EMPENHO NÃO CADASTRADO: ${numNE} não existe para a gestora no SIPAC (orçamento ${ano})` +
+        (String(ano) !== ANO ? ` – é empenho de ${ano} (exercício anterior / restos a pagar), procurado com o ano orçamentário ${ano}: ver com a chefia`
           : ' – conferir o nº do empenho na capa e na Nota de Empenho') +
         (fonte ? ` [empenho lido: ${fonte}]` : '') + ` – SIPAC: "${sp}"`;
     }
@@ -352,7 +352,7 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
 .sdl-alvo{outline:4px solid #e53935!important;outline-offset:2px;animation:sdlpisca 1s infinite}
 @keyframes sdlpisca{50%{outline-color:#ffb300}}
 </style>
-<header><b>SIPAC · Detalhar lote</b><small>v0.19.2</small><span class="sp"></span>
+<header><b>SIPAC · Detalhar lote</b><small>v0.20.0</small><span class="sp"></span>
   <span class="ic" id="sdl-pin" title="Empurrar a página para o painel não cobrir a Mesa">📌</span>
   <span class="ic" id="sdl-som" title="Aviso sonoro quando um processo estiver pronto para gravar">🔔</span>
   <span class="ic" id="sdl-max" title="Aumentar/diminuir">⛶</span>
@@ -1423,6 +1423,22 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
     }
     function fecharIframe() { if (F) { F.remove(); F = null; } }
 
+    // ---- ano orçamentário da sessão (combo menuForm:anoOrcamentario de /sipac/orcamento/index.jsf) ----
+    // Empenho de exercício anterior só aparece no "Outros" com o orçamento daquele ano. A troca vale para a
+    // sessão inteira (todas as abas): o painel volta para ANO no fim da fila / ao Parar.
+    const anoDaTela = () => (T().match(/Or[çc]amento:\s*(\d{4})/) || [])[1] || '';
+    async function trocarAnoOrc(ano) {
+      await nav(() => { F.src = '/sipac/orcamento/index.jsf'; });
+      const c = D().getElementById('menuForm:anoOrcamentario');
+      if (!c || ![...c.options].some(o => o.value === ano)) return false;
+      const img = D().getElementById('menuForm:imgStAno');
+      c.value = ano; ev(c, 'change');
+      if (img) { await until(() => img.style.display !== 'none', 2000); await until(() => img.style.display === 'none', 15000); }
+      await S(1500);
+      if (ano === ANO) ST.del('anoOrc'); else ST.set('anoOrc', ano);
+      return true;
+    }
+
     // ================= DETALHAMENTO AUTOMÁTICO =================
     // Liga só nesta página (começa desligado ao recarregar). Grava quando CONFERE após uma contagem;
     // divergência → pendência e segue; comprovante/relatório que não bate ou sessão expirada → PARA.
@@ -1490,6 +1506,10 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
           const min = Math.max(1, Math.round((Date.now() - AUTO.ini) / 60000));
           pararAuto(`fila concluída: ${AUTO.feitos} gravado(s) em ${min} min`);
           if (UI.som) bip();
+        }
+        if (F && ST.get('anoOrc', ANO) !== ANO) {
+          try { await trocarAnoOrc(ANO); LOG(`Ano orçamentário do SIPAC voltou para ${ANO}.`); }
+          catch (e) { LOG(`⚠ Não consegui voltar o ano orçamentário do SIPAC para ${ANO} – troque no módulo Orçamento.`); }
         }
         prog(parar ? 'Parado.' : 'Fila de prontos concluída.');
         fecharIframe(); execBox(''); atual = null; parar = false;
@@ -1574,6 +1594,16 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
 
       try {
         await nav(() => { F.src = URL_FORM; });
+
+        // empenho de outro ano (só no "Outros") → troca o ano orçamentário; qualquer outro caso → volta para ANO
+        const anoOrc = x.semReq ? String(neAno) : ANO;
+        if (anoDaTela() && anoDaTela() !== anoOrc) {
+          etapa = 'troca do ano orçamentário';
+          if (!await trocarAnoOrc(anoOrc)) return pula(`não consegui mudar o ano orçamentário do SIPAC para ${anoOrc}`);
+          await nav(() => { F.src = URL_FORM; });
+          if (anoDaTela() !== anoOrc) return pula(`o SIPAC não mudou o ano orçamentário para ${anoOrc}`);
+          LOG(`${x.id}: ano orçamentário do SIPAC mudado para ${anoOrc}` + (anoOrc !== ANO ? ` (empenho ${x.ne}/${neAno})` : ''));
+        }
 
         etapa = x.semReq ? 'tela Outros / empenho' : 'consulta da requisição';
         if (x.semReq) {
@@ -2936,6 +2966,22 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
       });
       if (n) { ST.set('proc', P0); LOG(`Pendências de empenho atualizadas para o texto novo: ${n}.`); }
     })();
+
+    // v0.20: empenho de ano anterior "não cadastrado" agora é procurado no orçamento do ano dele → volta a PRONTO
+    (() => {
+      if (ST.get('v20empenho', false)) return;
+      const P0 = todos(); let n = 0;
+      Object.keys(P0).forEach(id => {
+        const r = P0[id];
+        if (r.st === 'PENDENTE' && r.semReq && r.neAno && String(r.neAno) !== ANO && /^EMPENHO NÃO CADASTRADO/.test(String(r.motivo || ''))) {
+          r.st = 'PRONTO'; r.motivo = ''; r.tentado = false; n++;
+        }
+      });
+      if (n) { ST.set('proc', P0); LOG(`${n} pendência(s) de empenho de ano anterior voltaram para PRONTO (o painel troca o ano orçamentário).`); }
+      ST.set('v20empenho', true);
+    })();
+    if (ST.get('anoOrc', ANO) !== ANO)
+      LOG(`⚠ O ano orçamentário do SIPAC pode ter ficado em ${ST.get('anoOrc', ANO)} – o próximo "Detalhar prontos" volta para ${ANO} (ou troque no módulo Orçamento).`);
 
     // ================= INÍCIO =================
     aplicarLayout();
