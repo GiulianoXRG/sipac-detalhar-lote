@@ -1,5 +1,8 @@
 # Histórico de versões
 
+## 0.20.1 — 26/10/2026
+- Corrigido "erro ao ler o PDF: The PDF file is empty": pendência antiga de processo de outro ano (ex.: 2025) era reanalisada e o PDF pedido com o ano 2026. Agora processo de outro ano nunca é reanalisado; ao analisar a página, essas pendências viram "processo de outro ano".
+
 ## 0.20.0 — 23/10/2026
 - Empenho de ano anterior (ex.: NE 2025) no "Outros": o painel troca o ano orçamentário do SIPAC (combo do módulo Orçamento) para o ano do empenho antes de pesquisar e volta para 2026 no fim da fila ou ao Parar.
 - Pendências "EMPENHO NÃO CADASTRADO" de empenho de ano anterior voltam para PRONTO uma vez, ao abrir o painel.

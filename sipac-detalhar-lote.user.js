@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SIPAC – Detalhar Despesas em lote
 // @namespace    giuliano.sipac
-// @version      0.20.0
+// @version      0.20.1
 // @description  Analisa a página da 07 - PAGOS, detalha os prontos (inclusive ISS com DAR em Tributos), arquiva SIMPLES/ISS por mês e move DARF/INSS para a 08.
 // @match        https://sipac.ufrn.br/sipac/*
 // @match        http://sipac.ufrn.br/sipac/*
@@ -19,7 +19,7 @@
 
   function iniciarPainel() {
     if (document.getElementById('sdl')) return;
-    const VERSAO = '0.20.0';
+    const VERSAO = '0.20.1';
 
     // ================= ESTADO =================
     const ST = {
@@ -352,7 +352,7 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
 .sdl-alvo{outline:4px solid #e53935!important;outline-offset:2px;animation:sdlpisca 1s infinite}
 @keyframes sdlpisca{50%{outline-color:#ffb300}}
 </style>
-<header><b>SIPAC · Detalhar lote</b><small>v0.20.0</small><span class="sp"></span>
+<header><b>SIPAC · Detalhar lote</b><small>v0.20.1</small><span class="sp"></span>
   <span class="ic" id="sdl-pin" title="Empurrar a página para o painel não cobrir a Mesa">📌</span>
   <span class="ic" id="sdl-som" title="Aviso sonoro quando um processo estiver pronto para gravar">🔔</span>
   <span class="ic" id="sdl-max" title="Aumentar/diminuir">⛶</span>
@@ -1347,6 +1347,11 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
         const x = idDoLink(a);
         if (!x) return;
         const r = P2[x.id];
+        // o PDF só é gerado com anoProcesso=ANO: processo de outro ano nunca entra na fila (nem reanalisado)
+        if (x.ano !== ANO) {
+          if (r && !['NOVO', 'PENDENTE'].includes(r.st)) { c.ja++; return; }
+          c.ano++; salvar(x.id, { num: x.num, dv: x.dv, pagina: pag, st: 'IGNORADO', motivo: 'processo de outro ano' }); return;
+        }
         const velho = r && r.st === 'PENDENTE' &&
           /requisições – detalhar manualmente|tem DAR \(ISS\) – fazer manualmente|detalhamento \d+\/\d+ \(req \d+\): conferência falhou: já liquidado|campo ausente: txtValor|contentDocument|interrompido|formulário não abriu|já liquidado = 0/.test(r.motivo || '') &&
           !/já gravado/.test(r.motivo || '') ||
@@ -1355,7 +1360,6 @@ tr.sdl-tr-cinza td{opacity:.6}tr.sdl-tr-verdee td,tr.sdl-tr-larane td{opacity:.5
         if (velho) { c.rev = (c.rev || 0) + 1; salvar(x.id, { st: 'NOVO', motivo: '' }); fila.push(x.id); return; }
         if (r && r.st !== 'NOVO') { c.ja++; return; }
         const base = { num: x.num, dv: x.dv, pagina: pag };
-        if (x.ano !== ANO) { c.ano++; salvar(x.id, Object.assign(base, { st: 'IGNORADO', motivo: 'processo de outro ano' })); return; }
         const tr = a.closest('tr');
         const assunto = norm(tr ? lerCampo(tr, 'Assunto Detalhado:') : '');
         const urg = norm(tr ? lerCampo(tr, 'Urgente:') : '');
